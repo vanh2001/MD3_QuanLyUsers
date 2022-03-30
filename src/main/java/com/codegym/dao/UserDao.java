@@ -18,6 +18,8 @@ public class UserDao implements IUserDAO{
     private static final String SELECT_All_USERS = "SELECT * FROM users";
     private static final String DELETE_USERS_SQL = "DELETE FROM users WHERE id = ?;";
     private static final String UPDATE_USERS_SQL = "UPDATE users SET name = ?,email= ?, country =? WHERE id = ?;";
+    public static final String GET_USER_BY_ID_PROCEDURE = "{CALL get_user_by_id(?)}";
+    public static final String CALL_INSERT_USER_PROCEDURE = "{CALL insert_user(?,?,?)}";
 
     public UserDao(){
     }
@@ -147,6 +149,43 @@ public class UserDao implements IUserDAO{
                     t = t.getCause();
                 }
             }
+        }
+    }
+
+    @Override
+    public User getUserById(int id) {
+        User user = null;
+        try(
+                Connection connection = getConnection();
+                CallableStatement callableStatement = connection.prepareCall(GET_USER_BY_ID_PROCEDURE);
+                ){
+            callableStatement.setInt(1, id);
+            ResultSet rs = callableStatement.executeQuery();
+            while (rs.next()){
+                String name = rs.getString("name");
+                String email = rs.getString("email");
+                String country = rs.getString("email");
+                user = new User(id,name,email,country);
+            }
+        } catch (SQLException e) {
+            e.printStackTrace();
+        }
+        return user;
+    }
+
+    @Override
+    public void insertUserStore(User user) throws SQLException {
+        try (
+                Connection connection = getConnection();
+                CallableStatement callableStatement = connection.prepareCall(CALL_INSERT_USER_PROCEDURE);
+                ) {
+            callableStatement.setString(1, user.getName());
+            callableStatement.setString(2, user.getEmail());
+            callableStatement.setString(3,user.getCountry());
+            System.out.println(callableStatement);
+            callableStatement.executeQuery();
+        }catch (SQLException e){
+            printSQLException(e);
         }
     }
 }

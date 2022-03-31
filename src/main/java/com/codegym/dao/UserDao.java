@@ -20,6 +20,7 @@ public class UserDao implements IUserDAO{
     private static final String UPDATE_USERS_SQL = "UPDATE users SET name = ?,email= ?, country =? WHERE id = ?;";
     public static final String GET_USER_BY_ID_PROCEDURE = "{CALL get_user_by_id(?)}";
     public static final String CALL_INSERT_USER_PROCEDURE = "{CALL insert_user(?,?,?)}";
+    public static final String INSERT_USER_PERMISSION_SQL = "INSERT INTO user_permision(userId, permisionId) VALUES(?,?)";
 
     public UserDao(){
     }
@@ -186,6 +187,64 @@ public class UserDao implements IUserDAO{
             callableStatement.executeQuery();
         }catch (SQLException e){
             printSQLException(e);
+        }
+    }
+
+    @Override
+    public void addUserTransaction(User user, int[] permisions) {
+        Connection connection = null;
+        //để thêm user
+        PreparedStatement pstmt = null;
+        // để chỉ định permission cho người dùng
+        PreparedStatement pstmtAssignment = null;
+        //để lấy user_id
+        ResultSet rs = null;
+        try {
+           connection = getConnection();
+           //set auto commit to false
+           connection.setAutoCommit(false);
+           //insert user
+            pstmt = connection.prepareStatement(INSERT_USERS_SQL, Statement.RETURN_GENERATED_KEYS);
+            pstmt.setString(1, user.getName());
+            pstmt.setString(2, user.getEmail());
+            pstmt.setString(3, user.getCountry());
+            int rowAffected = pstmt.executeUpdate();
+            //Lấy user id
+            rs = pstmt.getGeneratedKeys();
+            int userId = 0;
+            if (rs.next()){
+                userId = rs.getInt(1);
+            }
+            //Trong TH thêm thành công, chỉ định quyền cho người dùng
+            if(rowAffected == 1){
+                String sqlPivot = INSERT_USER_PERMISSION_SQL;
+                pstmtAssignment = connection.prepareStatement(sqlPivot);
+                for (int permissionId: permisions) {
+                    pstmtAssignment.setInt(1, userId);
+                    pstmtAssignment.setInt(2, permissionId);
+                    pstmtAssignment.executeUpdate();
+                }
+                connection.commit();
+            }else {
+                connection.rollback();
+            }
+        } catch (SQLException e) {
+            try {
+                if (connection != null)
+                    connection.rollback();
+            } catch (SQLException ex) {
+                System.out.println(ex.getMessage());
+            }
+            System.out.println(e.getMessage());
+        } finally {
+          try {
+              if (rs != null) rs.close();
+              if (pstmt != null) pstmt.close();
+              if (pstmtAssignment != null) pstmtAssignment.close();
+              if (connection != null) connection.close();
+          } catch (SQLException e) {
+              System.out.println(e.getMessage());
+          }
         }
     }
 }
